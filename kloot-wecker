@@ -1,0 +1,667 @@
+#!/usr/bin/env python3
+# kloot-wecker: a small alarm clock for the phone, touch-friendly TUI.
+#   kloot-wecker            manage alarms: the Qt Quick app (Quickshell, GPU)
+#   kloot-wecker tui        the same in a terminal (curses, the fallback)
+#   kloot-wecker sounds     the sound files the editor offers, as JSON
+#   kloot-wecker daemon     the scheduler (user service kloot-wecker.service)
+#   kloot-wecker ring [--sound FILE] [--no-window] [LABEL]  ring now
+#   kloot-wecker stop | snooze   end the ringing / again in SNOOZE_MIN minutes
+#   kloot-wecker list
+# Alarms: ~/.config/kloot-wecker/alarms.json. Each alarm can have its own
+# sound file, chosen in the editor from ~/Music, ~/.local/share/sounds and
+# /usr/share/sounds; otherwise SOUND from ~/.config/kloot-wecker/wecker.env,
+# otherwise the freedesktop alarm sound. An alarm without weekdays rings once
+# and then switches itself off.
+import curses, json, os, shutil, signal, subprocess, sys, time, uuid
+from datetime import datetime, timedelta
+
+HOME = os.path.expanduser("~")
+CONF = os.path.join(HOME, ".config/kloot-wecker")
+ALARMS = os.path.join(CONF, "alarms.json")
+SNOOZES = os.path.join(CONF, "snoozes.json")
+RUN = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "kloot-wecker")
+RINGING = os.path.join(RUN, "ringing.json")
+CMD = os.path.join(RUN, "cmd")
+SELF = os.path.abspath(__file__)
+SNOOZE_MIN = 5
+RING_MAX_MIN = 15  # stops by itself after this
+DEFAULT_SOUND = "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"
+AUDIO_EXT = (".mp3", ".ogg", ".oga", ".opus", ".flac", ".wav", ".m4a", ".aac", ".webm")
+QML_DIRS = [os.path.join(os.path.dirname(os.path.realpath(__file__)), "qml"),
+            os.path.join(HOME, ".local/share/kloot-wecker/qml")]
+DAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
+
+
+def env():
+    e = {"SOUND": DEFAULT_SOUND,
+         "VOLUME_START": "0.35", "VOLUME_END": "0.85", "RAMP_SECONDS": "40"}
+    try:
+        for line in open(os.path.join(CONF, "wecker.env")):
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                e[k.strip()] = os.path.expanduser(v.strip().strip('"'))
+    except OSError:
+        pass
+    return e
+
+
+def log(msg):
+    subprocess.run(["logger", "-t", "kloot-wecker", msg], check=False)
+
+
+def load(path, default):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return default
+
+
+def save(path, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f, indent=1)
+    os.replace(tmp, path)
+
+
+def days_text(days):
+    if not days:
+        return "einmalig"
+    if sorted(days) == list(range(7)):
+        return "täglich"
+    if sorted(days) == list(range(5)):
+        return "Mo–Fr"
+    if sorted(days) == [5, 6]:
+        return "Wochenende"
+    return " ".join(DAYS[d] for d in sorted(days))
+
+
+# ------------------------------------------------------------------ ringing
+
+def run(*argv):
+    subprocess.run(argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+
+
+def wake_screen():
+    run("omarchy-shell", "lock", "wake")
+    run("omarchy-brightness-display", "on")
+
+
+def get_volume():
+    try:
+        out = subprocess.run(["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"],
+                             capture_output=True, text=True).stdout
+        return float(out.split()[1])
+    except (IndexError, ValueError):
+        return None
+
+
+def set_volume(v):
+    run("wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "%.2f" % v)
+
+
+def sound_dirs():
+    music = os.path.join(HOME, "Music")
+    try:  # the localized music folder (xdg-user-dirs)
+        out = subprocess.run(["xdg-user-dir", "MUSIC"], capture_output=True, text=True).stdout.strip()
+        if out and out != HOME:
+            music = out
+    except OSError:
+        pass
+    return [music, os.path.join(HOME, ".local/share/sounds"), "/usr/share/sounds"]
+
+
+def find_sounds(limit=400):
+    found = []
+    for base in sound_dirs():
+        for root, dirs, files in os.walk(base):
+            dirs.sort()
+            for f in sorted(files):
+                if f.lower().endswith(AUDIO_EXT):
+                    found.append(os.path.join(root, f))
+                    if len(found) >= limit:
+                        return found
+    return found
+
+
+def sound_name(path):
+    if not path:
+        return "Standard"
+    return os.path.splitext(os.path.basename(path))[0]
+
+
+def preview(path, seconds=8):
+    """Play a sound for a few seconds (returns the player, or None)."""
+    try:
+        return subprocess.Popen(["timeout", str(seconds), "mpv", "--no-video", "--really-quiet",
+                                 path or env()["SOUND"]], stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                start_new_session=True)
+    except OSError:
+        return None
+
+
+def ring(label="Wecker", sound=None, window=True):
+    os.makedirs(RUN, exist_ok=True)
+    if os.path.exists(RINGING):
+        info = load(RINGING, {})
+        try:
+            os.kill(info.get("pid", 0), 0)
+            log("already ringing, %s skipped" % label)
+            return
+        except OSError:
+            pass
+    e = env()
+    if not sound or not os.path.isfile(sound):
+        sound = e["SOUND"]
+    try:
+        os.unlink(CMD)
+    except OSError:
+        pass
+    save(RINGING, {"pid": os.getpid(), "label": label, "started": time.time()})
+    log("ringing: %s" % label)
+    old_vol = get_volume()
+    run("wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "0")
+    v0, v1, ramp = float(e["VOLUME_START"]), float(e["VOLUME_END"]), float(e["RAMP_SECONDS"])
+    set_volume(v0)
+    player = subprocess.Popen(["mpv", "--no-video", "--really-quiet", "--loop=inf", sound],
+                              stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                              stderr=subprocess.DEVNULL, start_new_session=True)
+    wake_screen()
+    # The ring window, through Hyprland so it outlives nothing it shouldn't.
+    # Not for a test from the manager: that shows the ring screen itself.
+    if window:
+        run("omamobile-launch", "cmd", "--", SELF, "ringui")
+    start = last_wake = time.time()
+    action = "timeout"
+    while time.time() - start < RING_MAX_MIN * 60:
+        if os.path.exists(CMD):
+            action = open(CMD).read().strip() or "stop"
+            os.unlink(CMD)
+            break
+        if player.poll() is not None:  # sound file broken: a plain beep loop
+            player = subprocess.Popen(["sh", "-c", "while :; do pw-play %s || sleep 1; done" % DEFAULT_SOUND],
+                                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                      stderr=subprocess.DEVNULL, start_new_session=True)
+        t = time.time() - start
+        if t < ramp:
+            set_volume(v0 + (v1 - v0) * t / ramp)
+        if time.time() - last_wake > 20:  # keep the screen lit
+            wake_screen()
+            last_wake = time.time()
+        time.sleep(0.5)
+    try:
+        os.killpg(player.pid, signal.SIGTERM)
+    except OSError:
+        pass
+    if old_vol is not None:
+        set_volume(old_vol)
+    if action == "snooze":
+        snoozes = load(SNOOZES, [])
+        snoozes.append({"due": time.time() + SNOOZE_MIN * 60, "label": label, "sound": sound})
+        save(SNOOZES, snoozes)
+        log("snoozed %d min: %s" % (SNOOZE_MIN, label))
+    else:
+        log("%s: %s" % (action, label))
+    try:
+        os.unlink(RINGING)
+    except OSError:
+        pass
+
+
+def command(action):
+    if not os.path.exists(RINGING):
+        print("klingelt gerade nicht")
+        return 1
+    with open(CMD, "w") as f:
+        f.write(action)
+    return 0
+
+
+# ------------------------------------------------------------------ daemon
+
+def hms(t):
+    """'HH:MM' or 'HH:MM:SS' -> (h, m, s)."""
+    parts = [int(x) for x in str(t).split(":")] + [0, 0]
+    return parts[0], parts[1], parts[2]
+
+
+def daemon():
+    log("daemon started")
+    last = datetime.now()
+    while True:
+        now = datetime.now()
+        alarms = load(ALARMS, [])
+        changed = False
+        for a in alarms:
+            if not a.get("enabled", True):
+                continue
+            try:
+                h, m, sec = hms(a.get("time", ""))
+                at = now.replace(hour=h, minute=m, second=sec, microsecond=0)
+            except (ValueError, TypeError):
+                continue
+            if not (last < at <= now):  # due since the last look
+                continue
+            days = a.get("days") or []
+            if days and now.weekday() not in days:
+                continue
+            if not days:  # one-time alarm
+                a["enabled"] = False
+                changed = True
+            subprocess.Popen([SELF, "ring", "--sound", a.get("sound") or "", a.get("label") or "Wecker"])
+        if changed:
+            save(ALARMS, alarms)
+        snoozes = load(SNOOZES, [])
+        due = [s for s in snoozes if s["due"] <= time.time()]
+        if due:
+            save(SNOOZES, [s for s in snoozes if s["due"] > time.time()])
+            subprocess.Popen([SELF, "ring", "--sound", due[0].get("sound") or "", due[0].get("label") or "Wecker"])
+        last = now
+        time.sleep(1 - (time.time() % 1) + 0.02)
+
+
+# ------------------------------------------------------------------ TUI helpers
+
+class Screen:
+    """Draws boxes that react to taps (mouse events from foot) and keys."""
+
+    def __init__(self, scr):
+        self.scr = scr
+        self.hits = []
+        curses.curs_set(0)
+        curses.mousemask(curses.ALL_MOUSE_EVENTS | curses.REPORT_MOUSE_POSITION)
+        curses.mouseinterval(0)
+        curses.start_color()
+        curses.use_default_colors()
+        curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_GREEN)
+        curses.init_pair(2, curses.COLOR_BLACK, curses.COLOR_RED)
+        curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_WHITE)
+        curses.init_pair(4, curses.COLOR_WHITE, -1)
+        curses.init_pair(5, curses.COLOR_BLACK, curses.COLOR_YELLOW)
+        scr.timeout(500)
+
+    def size(self):
+        return self.scr.getmaxyx()
+
+    def text(self, y, x, s, attr=0):
+        h, w = self.size()
+        if 0 <= y < h and x < w:
+            try:
+                self.scr.addstr(y, max(0, x), s[: max(0, w - x - 1)], attr)
+            except curses.error:
+                pass
+
+    def center(self, y, s, attr=0):
+        h, w = self.size()
+        self.text(y, max(0, (w - len(s)) // 2), s, attr)
+
+    def button(self, y, x, hgt, wid, label, action, color=3):
+        attr = curses.color_pair(color) | curses.A_BOLD
+        for r in range(hgt):
+            self.text(y + r, x, " " * wid, attr)
+        self.text(y + hgt // 2, x + max(0, (wid - len(label)) // 2), label, attr)
+        self.hits.append((y, x, hgt, wid, action))
+
+    def event(self):
+        """A tapped action, a key, or None."""
+        try:
+            ch = self.scr.get_wch()
+        except curses.error:
+            return None
+        if ch == curses.KEY_MOUSE:
+            try:
+                _, mx, my, _, bstate = curses.getmouse()
+            except curses.error:
+                return None
+            if not bstate & (curses.BUTTON1_CLICKED | curses.BUTTON1_PRESSED | curses.BUTTON1_RELEASED):
+                return None
+            if bstate & curses.BUTTON1_RELEASED and not bstate & curses.BUTTON1_CLICKED:
+                return None  # act on the press; a release would act twice
+            for y, x, hgt, wid, action in reversed(self.hits):
+                if y <= my < y + hgt and x <= mx < x + wid:
+                    return action
+            return None
+        return ch
+
+    def begin(self):
+        self.hits = []
+        self.scr.erase()
+
+
+BIG = {
+    "0": ["███", "█ █", "█ █", "█ █", "███"], "1": [" ██", "  █", "  █", "  █", "  █"],
+    "2": ["███", "  █", "███", "█  ", "███"], "3": ["███", "  █", "███", "  █", "███"],
+    "4": ["█ █", "█ █", "███", "  █", "  █"], "5": ["███", "█  ", "███", "  █", "███"],
+    "6": ["███", "█  ", "███", "█ █", "███"], "7": ["███", "  █", "  █", "  █", "  █"],
+    "8": ["███", "█ █", "███", "█ █", "███"], "9": ["███", "█ █", "███", "  █", "███"],
+    ":": ["   ", " █ ", "   ", " █ ", "   "],
+}
+
+
+def big_time(sc, y, s):
+    rows = [" ".join(BIG[c][r] for c in s) for r in range(5)]
+    for i, row in enumerate(rows):
+        sc.center(y + i, row, curses.A_BOLD)
+
+
+# ------------------------------------------------------------------ ring window
+
+def ringui(scr):
+    sc = Screen(scr)
+    gone = 0
+    while True:
+        if not os.path.exists(RINGING):
+            gone += 1
+            if gone > 2:
+                return
+        info = load(RINGING, {})
+        sc.begin()
+        h, w = sc.size()
+        big_time(sc, 2, datetime.now().strftime("%H:%M"))
+        sc.center(8, info.get("label", "Wecker"), curses.A_BOLD)
+        bh = max(3, (h - 12) // 2)
+        sc.button(10, 1, bh, w - 2, "SCHLUMMERN  %d min" % SNOOZE_MIN, "snooze", 5)
+        sc.button(11 + bh, 1, bh, w - 2, "STOPP", "stop", 2)
+        scr.refresh()
+        ev = sc.event()
+        if ev in ("snooze", "s", "S"):
+            command("snooze")
+            return
+        if ev in ("stop", "x", "X", "q", "\n", " "):
+            command("stop")
+            return
+
+
+# ------------------------------------------------------------------ manager
+
+def edit(sc, scr, alarm):
+    a = dict(alarm)
+    hh, mm, _ss = hms(a["time"])
+    days = set(a.get("days") or [])
+    sound = a.get("sound") or ""
+    player = None
+    while True:
+        sc.begin()
+        h, w = sc.size()
+        sc.center(0, "Wecker bearbeiten", curses.A_BOLD)
+        big_time(sc, 2, "%02d:%02d" % (hh, mm))
+        bw = max(6, (w - 5) // 4)
+        sc.button(8, 1, 3, bw, "Std -", "h-")
+        sc.button(8, 2 + bw, 3, bw, "Std +", "h+")
+        sc.button(8, 3 + 2 * bw, 3, bw, "Min -", "m-")
+        sc.button(8, 4 + 3 * bw, 3, bw, "Min +", "m+")
+        sc.button(12, 2 + bw, 3, bw, "-10", "m-10")
+        sc.button(12, 3 + 2 * bw, 3, bw, "+10", "m+10")
+        dw = max(4, (w - 2) // 7)
+        for i, d in enumerate(DAYS):
+            sc.button(16, 1 + i * dw, 3, dw - 1, d, "d%d" % i, 1 if i in days else 3)
+        sc.text(19, 1, "Ohne Tag = einmalig. %s" % days_text(sorted(days)))
+        hw = (w - 3) // 2
+        sc.button(21, 1, 3, hw, "Mo–Fr", "wk")
+        sc.button(21, 2 + hw, 3, hw, "Täglich", "all")
+        sc.button(25, 1, 3, w - 13, "Ton: " + sound_name(sound), "sound")
+        sc.button(25, w - 11, 3, 10, "▶ / ■", "play")
+        sc.button(29, 1, 3, hw, "Speichern", "save", 1)
+        sc.button(29, 2 + hw, 3, hw, "Abbrechen", "back")
+        if "id" in alarm:
+            sc.button(33, 1, 3, w - 2, "Löschen", "del", 2)
+        scr.refresh()
+        ev = sc.event()
+        if ev is None:
+            continue
+        if ev == "h-": hh = (hh - 1) % 24
+        elif ev == "h+": hh = (hh + 1) % 24
+        elif ev == "m-": mm = (mm - 1) % 60
+        elif ev == "m+": mm = (mm + 1) % 60
+        elif ev == "m-10": mm = (mm - 10) % 60
+        elif ev == "m+10": mm = (mm + 10) % 60
+        elif isinstance(ev, str) and len(ev) == 2 and ev[0] == "d" and ev[1].isdigit():
+            days ^= {int(ev[1])}
+        elif ev == "wk": days = set(range(5))
+        elif ev == "all": days = set(range(7))
+        elif ev == "sound":
+            stop_player(player)
+            player = None
+            picked = pick_sound(sc, scr, sound)
+            if picked is not None:
+                sound = picked
+        elif ev == "play":
+            if player and player.poll() is None:
+                stop_player(player)
+                player = None
+            else:
+                player = preview(sound)
+        elif ev == "save":
+            stop_player(player)
+            a.update(time="%02d:%02d" % (hh, mm), days=sorted(days), enabled=True, sound=sound)
+            a.setdefault("id", uuid.uuid4().hex[:8])
+            a.setdefault("label", "Wecker")
+            return a
+        elif ev in ("back", "\x1b", "q"):
+            stop_player(player)
+            return None
+        elif ev == "del":
+            stop_player(player)
+            return "delete"
+
+
+def stop_player(player):
+    if player and player.poll() is None:
+        try:
+            os.killpg(player.pid, signal.SIGTERM)
+        except OSError:
+            pass
+
+
+def pick_sound(sc, scr, current):
+    """A list of sound files; returns the chosen path, "" for the default,
+    or None when cancelled. Tap a file to hear it, tap it again to take it."""
+    sounds = [""] + find_sounds()
+    top, chosen, player = 0, current, None
+    try:
+        while True:
+            sc.begin()
+            h, w = sc.size()
+            sc.center(0, "Ton wählen", curses.A_BOLD)
+            sc.text(1, 1, "Antippen = anhören, nochmal = nehmen")
+            rows = max(1, (h - 10) // 2)
+            for i, path in enumerate(sounds[top:top + rows]):
+                y = 3 + i * 2
+                label = sound_name(path) if path else "Standard (" + sound_name(env()["SOUND"]) + ")"
+                where = os.path.dirname(path).replace(HOME, "~") if path else ""
+                text = label if len(label) + len(where) + 4 > w - 4 else "%s  · %s" % (label, where)
+                sc.button(y, 1, 1, w - 2, text, ("pick", top + i), 1 if path == chosen else 3)
+            yb = h - 4
+            bw = (w - 4) // 3
+            sc.button(yb, 1, 3, bw, "▲", "up")
+            sc.button(yb, 2 + bw, 3, bw, "Abbrechen", "back")
+            sc.button(yb, 3 + 2 * bw, 3, bw, "▼", "down")
+            if len(sounds) == 1:
+                sc.text(5, 1, "Keine Tondateien in ~/Music gefunden.")
+            scr.refresh()
+            ev = sc.event()
+            if ev in ("up", curses.KEY_UP, curses.KEY_PPAGE):
+                top = max(0, top - rows)
+            elif ev in ("down", curses.KEY_DOWN, curses.KEY_NPAGE):
+                if top + rows < len(sounds):
+                    top += rows
+            elif ev in ("back", "\x1b", "q"):
+                return None
+            elif isinstance(ev, tuple) and ev[0] == "pick":
+                path = sounds[ev[1]]
+                if path == chosen and player is not None:
+                    return path
+                stop_player(player)
+                chosen, player = path, preview(path)
+    finally:
+        stop_player(player)
+
+
+def next_ring(alarm):
+    if not alarm.get("enabled", True):
+        return None
+    hh, mm, ss = hms(alarm["time"])
+    now = datetime.now()
+    for add in range(8):
+        d = (now + timedelta(days=add)).replace(hour=hh, minute=mm, second=ss, microsecond=0)
+        if d <= now:
+            continue
+        if not alarm.get("days") or d.weekday() in alarm["days"]:
+            return d
+    return None
+
+
+def until_text(d):
+    if not d:
+        return ""
+    mins = int((d - datetime.now()).total_seconds() // 60) + 1
+    return "in %d h %02d min" % (mins // 60, mins % 60)
+
+
+def test_ring(sc, scr, delay=5):
+    """Count down in the manager, ring, and show the ring screen right here
+    (no second window, so nothing closes and reopens)."""
+    end = time.time() + delay
+    while time.time() < end:
+        sc.begin()
+        h, w = sc.size()
+        sc.center(h // 2 - 1, "Test klingelt in %d s" % (int(end - time.time()) + 1), curses.A_BOLD)
+        sc.button(h // 2 + 1, 1, 3, w - 2, "Abbrechen", "back")
+        scr.refresh()
+        if sc.event() in ("back", "q", "\x1b"):
+            return
+    subprocess.Popen([SELF, "ring", "--no-window", "Test"], start_new_session=True,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    for _ in range(40):  # up to 4 s for the ring to start
+        if os.path.exists(RINGING):
+            break
+        time.sleep(0.1)
+    ringui(scr)
+
+
+def manager(scr):
+    sc = Screen(scr)
+    while True:
+        alarms = sorted(load(ALARMS, []), key=lambda a: a["time"])
+        sc.begin()
+        h, w = sc.size()
+        sc.center(0, "Wecker   %s" % datetime.now().strftime("%H:%M"), curses.A_BOLD)
+        y = 2
+        if not alarms:
+            sc.center(4, "Noch kein Wecker. Tippe auf  + Neuer Wecker.")
+            y = 6
+        for a in alarms:
+            on = a.get("enabled", True)
+            tw = w - 11
+            sc.button(y, 1, 3, tw, "%s  %s" % (a["time"], days_text(a.get("days"))), ("edit", a["id"]),
+                      3 if on else 4)
+            sc.button(y, tw + 2, 3, 8, "AN" if on else "AUS", ("toggle", a["id"]), 1 if on else 2)
+            if on:
+                sc.text(y + 3, 2, until_text(next_ring(a)))
+            y += 5
+        sc.button(y, 1, 3, w - 2, "+ Neuer Wecker", "new", 1)
+        hw = (w - 3) // 2
+        sc.button(y + 4, 1, 3, hw, "Test (5 s)", "test")
+        sc.button(y + 4, 2 + hw, 3, hw, "Schließen", "quit")
+        scr.refresh()
+        ev = sc.event()
+        if ev in ("quit", "q"):
+            return
+        if ev == "new":
+            r = edit(sc, scr, {"time": (datetime.now() + timedelta(hours=1)).strftime("%H:00"), "days": []})
+            if isinstance(r, dict):
+                alarms.append(r)
+                save(ALARMS, alarms)
+        elif ev == "test":
+            test_ring(sc, scr)
+        elif isinstance(ev, tuple):
+            kind, aid = ev
+            for i, a in enumerate(alarms):
+                if a["id"] != aid:
+                    continue
+                if kind == "toggle":
+                    a["enabled"] = not a.get("enabled", True)
+                else:
+                    r = edit(sc, scr, a)
+                    if r == "delete":
+                        alarms.pop(i)
+                    elif isinstance(r, dict):
+                        alarms[i] = r
+                save(ALARMS, alarms)
+                break
+
+
+def qml_dir():
+    for d in QML_DIRS:
+        if os.path.isfile(os.path.join(d, "shell.qml")):
+            return d
+    return None
+
+
+def gui(mode):
+    """The Qt Quick app; falls back to the terminal UI without Quickshell."""
+    d = qml_dir()
+    qs = shutil.which("quickshell")
+    os.makedirs(CONF, exist_ok=True)
+    os.makedirs(RUN, exist_ok=True)
+    if d and qs:
+        os.environ["KLOOT_WECKER_MODE"] = mode
+        os.environ["KLOOT_WECKER_BIN"] = SELF
+        os.environ["KLOOT_WECKER_CONF"] = CONF
+        os.environ["KLOOT_WECKER_RUN"] = RUN
+        os.execv(qs, [qs, "-p", os.path.join(d, "shell.qml")])
+    if mode == "ring":
+        os.execvp("foot", ["foot", "--title=Wecker", SELF, "ringtui"])
+    if not sys.stdout.isatty():
+        os.execvp("foot", ["foot", "--title=Wecker", SELF, "tui"])
+    curses.wrapper(manager)
+
+
+def main():
+    os.environ.setdefault("ESCDELAY", "25")
+    args = sys.argv[1:]
+    cmd = args[0] if args else "ui"
+    if cmd == "ui":
+        gui("manage")
+    elif cmd == "tui":
+        curses.wrapper(manager)
+    elif cmd == "ringui":
+        gui("ring")
+    elif cmd == "ringtui":
+        curses.wrapper(ringui)
+    elif cmd == "sounds":
+        print(json.dumps([{"path": "", "play": env()["SOUND"], "name": "Standard (%s)" % sound_name(env()["SOUND"])}] +
+                         [{"path": p, "name": sound_name(p),
+                           "dir": os.path.dirname(p).replace(HOME, "~")} for p in find_sounds()]))
+    elif cmd == "nextinfo":
+        out = {}
+        for a in load(ALARMS, []):
+            out[a["id"]] = until_text(next_ring(a))
+        print(json.dumps(out))
+    elif cmd == "daemon":
+        daemon()
+    elif cmd == "ring":
+        rest, sound, window = args[1:], None, True
+        while rest[:1] in (["--sound"], ["--no-window"]):
+            if rest[0] == "--no-window":
+                window, rest = False, rest[1:]
+            else:
+                sound, rest = (rest[1] if len(rest) > 1 else None), rest[2:]
+        ring(" ".join(rest) or "Wecker", sound or None, window)
+    elif cmd in ("stop", "snooze"):
+        return command(cmd)
+    elif cmd == "list":
+        for a in sorted(load(ALARMS, []), key=lambda a: a["time"]):
+            print("%s  %-12s %s  %s" % (a["time"], days_text(a.get("days")),
+                                        "an " if a.get("enabled", True) else "aus", until_text(next_ring(a))))
+    else:
+        print(__doc__ or open(SELF).read().split("\nimport", 1)[0])
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
