@@ -1,0 +1,6 @@
+[Unit]
+Description=OmaAlarm ringing (alarm %i)
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/oma_alarm fire %i

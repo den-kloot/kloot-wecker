@@ -1,0 +1,6 @@
+[Unit]
+Description=OmaAlarm: write the alarm timers from alarms.json
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/oma_alarm sync

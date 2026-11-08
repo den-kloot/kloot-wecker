@@ -1,0 +1,9 @@
+[Unit]
+Description=OmaAlarm: re-sync the timers when alarms.json changes
+
+[Path]
+PathChanged=%h/.config/oma_alarm/alarms.json
+Unit=oma_alarm-sync.service
+
+[Install]
+WantedBy=default.target

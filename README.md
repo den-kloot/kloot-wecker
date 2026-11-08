@@ -3,7 +3,7 @@
 A small alarm clock for Linux phones, built on Omarchy Mobile: a Qt Quick
 app (run by [Quickshell](https://quickshell.org), GPU-rendered) in the
 Omarchy look (square, monospace, thin borders) with scroll wheels for hours,
-minutes and seconds, a user service that rings,
+minutes and seconds, systemd user timers that ring,
 and a ring screen with **Snooze (5 min)** and **Stop**.
 It takes its colors from the current Omarchy theme
 (`~/.local/state/omarchy/current/theme/colors.toml`) and follows a theme switch
@@ -39,15 +39,26 @@ ring window use Omarchy Mobile's `omarchy-shell` and `omamobile-launch`.
 ## Use
 
 - App menu: **OmaAlarm**. Or `oma_alarm` in a terminal.
-- `oma_alarm tui | list | stop | snooze | sounds | ring [--sound FILE] [--no-window] [LABEL]`
+- `oma_alarm tui | list | stop | snooze | sounds | sync | ring [--sound FILE] [--no-window] [LABEL]`
 - Alarms: `~/.config/oma_alarm/alarms.json`.
 - Settings: `~/.config/oma_alarm/oma_alarm.env`:
   `SOUND=` (default sound for alarms without their own), `VOLUME_START=`,
   `VOLUME_END=`, `RAMP_SECONDS=`.
 
+## How it rings
+
+Nothing runs between alarms. Each enabled alarm is a systemd user timer
+(`oma_alarm-alarm-<id>.timer`, `OnCalendar=` with the weekdays and time,
+`AccuracySec=1s`) that starts `oma_alarm-ring@<id>.service`. When
+`alarms.json` changes, `oma_alarm-sync.path` runs `oma_alarm sync`, which
+rewrites the timers. A one-time alarm switches itself off after ringing;
+snooze is a transient timer (`systemd-run --on-active=5min`).
+`systemctl --user list-timers 'oma_alarm-*'` shows what is set.
+
 ## Limits
 
-The phone has to be awake at alarm time: there's no RTC wake from suspend yet.
+The phone has to be awake at alarm time: user timers can't wake a suspended
+system (`WakeSystem=` needs a system timer).
 On the Pixel 9a the phone doesn't suspend while the modem runs, so it works
 there today.
 
