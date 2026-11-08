@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- OmaAlarm: a bell on a rounded square. Original artwork, MIT. -->
+  <rect x="8" y="8" width="112" height="112" rx="28" fill="#e8873a"/>
+  <path d="M64 26c-3.3 0-6 2.7-6 6v2.6C46.4 37.4 38 47.9 38 60.5V75l-8.5 10.2V90h69v-4.8L90 75V60.5c0-12.6-8.4-23.1-20-25.9V32c0-3.3-2.7-6-6-6z" fill="#ffffff"/>
+  <path d="M54 95h20a10 10 0 0 1-20 0z" fill="#ffffff"/>
+</svg>
