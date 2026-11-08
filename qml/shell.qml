@@ -1,5 +1,5 @@
-// kloot-wecker: the Qt Quick app (run by `kloot-wecker` through Quickshell).
-// KLOOT_WECKER_MODE=manage: the alarm list and editor; =ring: the ring screen.
+// omaalarm: the Qt Quick app (run by `omaalarm` through Quickshell).
+// OMAALARM_MODE=manage: the alarm list and editor; =ring: the ring screen.
 import QtQuick
 import QtQuick.Controls
 import Quickshell
@@ -8,10 +8,10 @@ import Quickshell.Io
 ShellRoot {
     id: root
 
-    readonly property string mode: Quickshell.env("KLOOT_WECKER_MODE") || "manage"
-    readonly property string bin: Quickshell.env("KLOOT_WECKER_BIN") || "kloot-wecker"
-    readonly property string conf: Quickshell.env("KLOOT_WECKER_CONF") || (Quickshell.env("HOME") + "/.config/kloot-wecker")
-    readonly property string run: Quickshell.env("KLOOT_WECKER_RUN") || "/tmp/kloot-wecker"
+    readonly property string mode: Quickshell.env("OMAALARM_MODE") || "manage"
+    readonly property string bin: Quickshell.env("OMAALARM_BIN") || "omaalarm"
+    readonly property string conf: Quickshell.env("OMAALARM_CONF") || (Quickshell.env("HOME") + "/.config/omaalarm")
+    readonly property string run: Quickshell.env("OMAALARM_RUN") || "/tmp/omaalarm"
     readonly property var dayNames: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     readonly property var dayLetters: ["M", "T", "W", "T", "F", "S", "S"]
 
@@ -313,7 +313,7 @@ ShellRoot {
 
     FloatingWindow {
         id: win
-        title: "Alarm clock"
+        title: "Oma Alarm"
         color: root.bg
         implicitWidth: 412
         implicitHeight: 900
@@ -340,7 +340,7 @@ ShellRoot {
             }
             Text {
                 id: title
-                text: "> alarms_"
+                text: "> omaalarm_"
                 color: root.accent
                 font.family: root.mono; font.pixelSize: 28; font.bold: true
                 anchors.left: parent.left; anchors.leftMargin: 20

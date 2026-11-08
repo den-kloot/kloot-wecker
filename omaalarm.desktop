@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=Alarm clock
+Name=Oma Alarm
 Comment=Alarms with snooze
-Exec=@BIN@/kloot-wecker
+Exec=@BIN@/omaalarm
 Icon=alarm-symbolic
 Terminal=false
 Categories=Utility;Clock;

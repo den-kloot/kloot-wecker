@@ -1,14 +1,14 @@
 #!/bin/bash
-# Installs kloot-wecker for the current user.
+# Installs omaalarm for the current user.
 set -eu
 cd "$(dirname "$0")"
 bin=$HOME/.local/bin
-install -Dm755 kloot-wecker "$bin/kloot-wecker"
-install -Dm644 qml/shell.qml "$HOME/.local/share/kloot-wecker/qml/shell.qml"
-install -Dm644 kloot-wecker.service "$HOME/.config/systemd/user/kloot-wecker.service"
+install -Dm755 omaalarm "$bin/omaalarm"
+install -Dm644 qml/shell.qml "$HOME/.local/share/omaalarm/qml/shell.qml"
+install -Dm644 omaalarm.service "$HOME/.config/systemd/user/omaalarm.service"
 mkdir -p "$HOME/.local/share/applications"
-sed "s|@BIN@|$bin|" kloot-wecker.desktop >"$HOME/.local/share/applications/kloot-wecker.desktop"
+sed "s|@BIN@|$bin|" omaalarm.desktop >"$HOME/.local/share/applications/omaalarm.desktop"
 systemctl --user daemon-reload
-systemctl --user enable --now kloot-wecker.service
-systemctl --user restart kloot-wecker.service
-echo "installed; open \"Alarm clock\" from the app menu"
+systemctl --user enable --now omaalarm.service
+systemctl --user restart omaalarm.service
+echo "installed; open \"Oma Alarm\" from the app menu"

@@ -1,4 +1,4 @@
-# kloot-wecker
+# omaalarm
 
 A small alarm clock for Linux phones, built on Omarchy Mobile: a Qt Quick
 app (run by [Quickshell](https://quickshell.org), GPU-rendered) in the
@@ -8,7 +8,7 @@ and a ring screen with **Snooze (5 min)** and **Stop**.
 It takes its colors from the current Omarchy theme
 (`~/.local/state/omarchy/current/theme/colors.toml`) and follows a theme switch
 within two seconds. Times are the phone's local time. Without Quickshell it falls back to a
-terminal UI in [foot](https://codeberg.org/dnkl/foot) (`kloot-wecker tui`).
+terminal UI in [foot](https://codeberg.org/dnkl/foot) (`omaalarm tui`).
 
 | Alarms | Edit | Sound | Ringing |
 | --- | --- | --- | --- |
@@ -29,8 +29,8 @@ terminal UI in [foot](https://codeberg.org/dnkl/foot) (`kloot-wecker tui`).
 ## Install
 
 ```
-git clone https://github.com/den-kloot/kloot-wecker
-cd kloot-wecker && ./install.sh   # program, user service, app-menu entry
+git clone https://github.com/den-kloot/omaalarm
+cd omaalarm && ./install.sh   # program, user service, app-menu entry
 ```
 
 Needs Python 3, Quickshell (Qt 6), mpv and wpctl (PipeWire); foot only for the fallback. The screen wake and the
@@ -38,10 +38,10 @@ ring window use Omarchy Mobile's `omarchy-shell` and `omamobile-launch`.
 
 ## Use
 
-- App menu: **Alarm clock**. Or `kloot-wecker` in a terminal.
-- `kloot-wecker tui | list | stop | snooze | sounds | ring [--sound FILE] [--no-window] [LABEL]`
-- Alarms: `~/.config/kloot-wecker/alarms.json`.
-- Settings: `~/.config/kloot-wecker/wecker.env`:
+- App menu: **Oma Alarm**. Or `omaalarm` in a terminal.
+- `omaalarm tui | list | stop | snooze | sounds | ring [--sound FILE] [--no-window] [LABEL]`
+- Alarms: `~/.config/omaalarm/alarms.json`.
+- Settings: `~/.config/omaalarm/omaalarm.env`:
   `SOUND=` (default sound for alarms without their own), `VOLUME_START=`,
   `VOLUME_END=`, `RAMP_SECONDS=`.
 

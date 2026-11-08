@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
-# kloot-wecker: a small alarm clock for the phone, touch-friendly TUI.
-#   kloot-wecker            manage alarms: the Qt Quick app (Quickshell, GPU)
-#   kloot-wecker tui        the same in a terminal (curses, the fallback)
-#   kloot-wecker sounds     the sound files the editor offers, as JSON
-#   kloot-wecker daemon     the scheduler (user service kloot-wecker.service)
-#   kloot-wecker ring [--sound FILE] [--no-window] [LABEL]  ring now
-#   kloot-wecker stop | snooze   end the ringing / again in SNOOZE_MIN minutes
-#   kloot-wecker list
-# Alarms: ~/.config/kloot-wecker/alarms.json. Each alarm can have its own
+# omaalarm: a small alarm clock for the phone, touch-friendly TUI.
+#   omaalarm            manage alarms: the Qt Quick app (Quickshell, GPU)
+#   omaalarm tui        the same in a terminal (curses, the fallback)
+#   omaalarm sounds     the sound files the editor offers, as JSON
+#   omaalarm daemon     the scheduler (user service omaalarm.service)
+#   omaalarm ring [--sound FILE] [--no-window] [LABEL]  ring now
+#   omaalarm stop | snooze   end the ringing / again in SNOOZE_MIN minutes
+#   omaalarm list
+# Alarms: ~/.config/omaalarm/alarms.json. Each alarm can have its own
 # sound file, chosen in the editor from ~/Music, ~/.local/share/sounds and
-# /usr/share/sounds; otherwise SOUND from ~/.config/kloot-wecker/wecker.env,
+# /usr/share/sounds; otherwise SOUND from ~/.config/omaalarm/omaalarm.env,
 # otherwise the freedesktop alarm sound. An alarm without weekdays rings once
 # and then switches itself off.
 import curses, json, os, shutil, signal, subprocess, sys, time, uuid
 from datetime import datetime, timedelta
 
 HOME = os.path.expanduser("~")
-CONF = os.path.join(HOME, ".config/kloot-wecker")
+CONF = os.path.join(HOME, ".config/omaalarm")
 ALARMS = os.path.join(CONF, "alarms.json")
 SNOOZES = os.path.join(CONF, "snoozes.json")
-RUN = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "kloot-wecker")
+RUN = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "omaalarm")
 RINGING = os.path.join(RUN, "ringing.json")
 CMD = os.path.join(RUN, "cmd")
 SELF = os.path.abspath(__file__)
@@ -28,7 +28,7 @@ RING_MAX_MIN = 15  # stops by itself after this
 DEFAULT_SOUND = "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"
 AUDIO_EXT = (".mp3", ".ogg", ".oga", ".opus", ".flac", ".wav", ".m4a", ".aac", ".webm")
 QML_DIRS = [os.path.join(os.path.dirname(os.path.realpath(__file__)), "qml"),
-            os.path.join(HOME, ".local/share/kloot-wecker/qml")]
+            os.path.join(HOME, ".local/share/omaalarm/qml")]
 DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 
@@ -36,7 +36,7 @@ def env():
     e = {"SOUND": DEFAULT_SOUND,
          "VOLUME_START": "0.35", "VOLUME_END": "0.85", "RAMP_SECONDS": "40"}
     try:
-        for line in open(os.path.join(CONF, "wecker.env")):
+        for line in open(os.path.join(CONF, "omaalarm.env")):
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
                 k, v = line.split("=", 1)
@@ -47,7 +47,7 @@ def env():
 
 
 def log(msg):
-    subprocess.run(["logger", "-t", "kloot-wecker", msg], check=False)
+    subprocess.run(["logger", "-t", "omaalarm", msg], check=False)
 
 
 def load(path, default):
@@ -608,15 +608,15 @@ def gui(mode):
     os.makedirs(CONF, exist_ok=True)
     os.makedirs(RUN, exist_ok=True)
     if d and qs:
-        os.environ["KLOOT_WECKER_MODE"] = mode
-        os.environ["KLOOT_WECKER_BIN"] = SELF
-        os.environ["KLOOT_WECKER_CONF"] = CONF
-        os.environ["KLOOT_WECKER_RUN"] = RUN
+        os.environ["OMAALARM_MODE"] = mode
+        os.environ["OMAALARM_BIN"] = SELF
+        os.environ["OMAALARM_CONF"] = CONF
+        os.environ["OMAALARM_RUN"] = RUN
         os.execv(qs, [qs, "-p", os.path.join(d, "shell.qml")])
     if mode == "ring":
-        os.execvp("foot", ["foot", "--title=Alarm clock", SELF, "ringtui"])
+        os.execvp("foot", ["foot", "--title=Oma Alarm", SELF, "ringtui"])
     if not sys.stdout.isatty():
-        os.execvp("foot", ["foot", "--title=Alarm clock", SELF, "tui"])
+        os.execvp("foot", ["foot", "--title=Oma Alarm", SELF, "tui"])
     curses.wrapper(manager)
 
 
