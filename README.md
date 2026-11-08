@@ -8,7 +8,7 @@ and a ring screen with **Snooze (5 min)** and **Stop**.
 It takes its colors from the current Omarchy theme
 (`~/.local/state/omarchy/current/theme/colors.toml`) and follows a theme switch
 within two seconds. Times are the phone's local time. Without Quickshell it falls back to a
-terminal UI in [foot](https://codeberg.org/dnkl/foot) (`omaalarm tui`).
+terminal UI in [foot](https://codeberg.org/dnkl/foot) (`oma_alarm tui`).
 
 | Alarms | Edit | Sound | Ringing |
 | --- | --- | --- | --- |
@@ -29,8 +29,8 @@ terminal UI in [foot](https://codeberg.org/dnkl/foot) (`omaalarm tui`).
 ## Install
 
 ```
-git clone https://github.com/den-kloot/omaalarm
-cd omaalarm && ./install.sh   # program, user service, app-menu entry
+git clone https://github.com/den-kloot/oma_alarm
+cd oma_alarm && ./install.sh   # program, user service, app-menu entry
 ```
 
 Needs Python 3, Quickshell (Qt 6), mpv and wpctl (PipeWire); foot only for the fallback. The screen wake and the
@@ -38,10 +38,10 @@ ring window use Omarchy Mobile's `omarchy-shell` and `omamobile-launch`.
 
 ## Use
 
-- App menu: **OmaAlarm**. Or `omaalarm` in a terminal.
-- `omaalarm tui | list | stop | snooze | sounds | ring [--sound FILE] [--no-window] [LABEL]`
-- Alarms: `~/.config/omaalarm/alarms.json`.
-- Settings: `~/.config/omaalarm/omaalarm.env`:
+- App menu: **OmaAlarm**. Or `oma_alarm` in a terminal.
+- `oma_alarm tui | list | stop | snooze | sounds | ring [--sound FILE] [--no-window] [LABEL]`
+- Alarms: `~/.config/oma_alarm/alarms.json`.
+- Settings: `~/.config/oma_alarm/oma_alarm.env`:
   `SOUND=` (default sound for alarms without their own), `VOLUME_START=`,
   `VOLUME_END=`, `RAMP_SECONDS=`.
 

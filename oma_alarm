@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
-# omaalarm: a small alarm clock for the phone, touch-friendly TUI.
-#   omaalarm            manage alarms: the Qt Quick app (Quickshell, GPU)
-#   omaalarm tui        the same in a terminal (curses, the fallback)
-#   omaalarm sounds     the sound files the editor offers, as JSON
-#   omaalarm daemon     the scheduler (user service omaalarm.service)
-#   omaalarm ring [--sound FILE] [--no-window] [LABEL]  ring now
-#   omaalarm stop | snooze   end the ringing / again in SNOOZE_MIN minutes
-#   omaalarm list
-# Alarms: ~/.config/omaalarm/alarms.json. Each alarm can have its own
+# oma_alarm: a small alarm clock for the phone, touch-friendly TUI.
+#   oma_alarm            manage alarms: the Qt Quick app (Quickshell, GPU)
+#   oma_alarm tui        the same in a terminal (curses, the fallback)
+#   oma_alarm sounds     the sound files the editor offers, as JSON
+#   oma_alarm daemon     the scheduler (user service oma_alarm.service)
+#   oma_alarm ring [--sound FILE] [--no-window] [LABEL]  ring now
+#   oma_alarm stop | snooze   end the ringing / again in SNOOZE_MIN minutes
+#   oma_alarm list
+# Alarms: ~/.config/oma_alarm/alarms.json. Each alarm can have its own
 # sound file, chosen in the editor from ~/Music, ~/.local/share/sounds and
-# /usr/share/sounds; otherwise SOUND from ~/.config/omaalarm/omaalarm.env,
+# /usr/share/sounds; otherwise SOUND from ~/.config/oma_alarm/oma_alarm.env,
 # otherwise the freedesktop alarm sound. An alarm without weekdays rings once
 # and then switches itself off.
 import curses, json, os, shutil, signal, subprocess, sys, time, uuid
 from datetime import datetime, timedelta
 
 HOME = os.path.expanduser("~")
-CONF = os.path.join(HOME, ".config/omaalarm")
+CONF = os.path.join(HOME, ".config/oma_alarm")
 ALARMS = os.path.join(CONF, "alarms.json")
 SNOOZES = os.path.join(CONF, "snoozes.json")
-RUN = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "omaalarm")
+RUN = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "oma_alarm")
 RINGING = os.path.join(RUN, "ringing.json")
 CMD = os.path.join(RUN, "cmd")
 SELF = os.path.abspath(__file__)
@@ -28,7 +28,7 @@ RING_MAX_MIN = 15  # stops by itself after this
 DEFAULT_SOUND = "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"
 AUDIO_EXT = (".mp3", ".ogg", ".oga", ".opus", ".flac", ".wav", ".m4a", ".aac", ".webm")
 QML_DIRS = [os.path.join(os.path.dirname(os.path.realpath(__file__)), "qml"),
-            os.path.join(HOME, ".local/share/omaalarm/qml")]
+            os.path.join(HOME, ".local/share/oma_alarm/qml")]
 DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 
@@ -36,7 +36,7 @@ def env():
     e = {"SOUND": DEFAULT_SOUND,
          "VOLUME_START": "0.35", "VOLUME_END": "0.85", "RAMP_SECONDS": "40"}
     try:
-        for line in open(os.path.join(CONF, "omaalarm.env")):
+        for line in open(os.path.join(CONF, "oma_alarm.env")):
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
                 k, v = line.split("=", 1)
@@ -47,7 +47,7 @@ def env():
 
 
 def log(msg):
-    subprocess.run(["logger", "-t", "omaalarm", msg], check=False)
+    subprocess.run(["logger", "-t", "oma_alarm", msg], check=False)
 
 
 def load(path, default):
@@ -608,11 +608,11 @@ def gui(mode):
     os.makedirs(CONF, exist_ok=True)
     os.makedirs(RUN, exist_ok=True)
     if d and qs:
-        os.environ["OMAALARM_MODE"] = mode
-        os.environ["QS_APP_ID"] = "omaalarm"  # window app id = the desktop entry
-        os.environ["OMAALARM_BIN"] = SELF
-        os.environ["OMAALARM_CONF"] = CONF
-        os.environ["OMAALARM_RUN"] = RUN
+        os.environ["OMA_ALARM_MODE"] = mode
+        os.environ["QS_APP_ID"] = "oma_alarm"  # window app id = the desktop entry
+        os.environ["OMA_ALARM_BIN"] = SELF
+        os.environ["OMA_ALARM_CONF"] = CONF
+        os.environ["OMA_ALARM_RUN"] = RUN
         os.execv(qs, [qs, "-p", os.path.join(d, "shell.qml")])
     if mode == "ring":
         os.execvp("foot", ["foot", "--title=OmaAlarm", SELF, "ringtui"])

@@ -1,5 +1,5 @@
-// omaalarm: the Qt Quick app (run by `omaalarm` through Quickshell).
-// OMAALARM_MODE=manage: the alarm list and editor; =ring: the ring screen.
+// oma_alarm: the Qt Quick app (run by `oma_alarm` through Quickshell).
+// OMA_ALARM_MODE=manage: the alarm list and editor; =ring: the ring screen.
 import QtQuick
 import QtQuick.Controls
 import Quickshell
@@ -8,10 +8,10 @@ import Quickshell.Io
 ShellRoot {
     id: root
 
-    readonly property string mode: Quickshell.env("OMAALARM_MODE") || "manage"
-    readonly property string bin: Quickshell.env("OMAALARM_BIN") || "omaalarm"
-    readonly property string conf: Quickshell.env("OMAALARM_CONF") || (Quickshell.env("HOME") + "/.config/omaalarm")
-    readonly property string run: Quickshell.env("OMAALARM_RUN") || "/tmp/omaalarm"
+    readonly property string mode: Quickshell.env("OMA_ALARM_MODE") || "manage"
+    readonly property string bin: Quickshell.env("OMA_ALARM_BIN") || "oma_alarm"
+    readonly property string conf: Quickshell.env("OMA_ALARM_CONF") || (Quickshell.env("HOME") + "/.config/oma_alarm")
+    readonly property string run: Quickshell.env("OMA_ALARM_RUN") || "/tmp/oma_alarm"
     readonly property var dayNames: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     readonly property var dayLetters: ["M", "T", "W", "T", "F", "S", "S"]
 

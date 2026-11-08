@@ -1,14 +1,14 @@
 #!/bin/bash
-# Installs omaalarm for the current user.
+# Installs oma_alarm for the current user.
 set -eu
 cd "$(dirname "$0")"
 bin=$HOME/.local/bin
-install -Dm755 omaalarm "$bin/omaalarm"
-install -Dm644 qml/shell.qml "$HOME/.local/share/omaalarm/qml/shell.qml"
-install -Dm644 omaalarm.service "$HOME/.config/systemd/user/omaalarm.service"
+install -Dm755 oma_alarm "$bin/oma_alarm"
+install -Dm644 qml/shell.qml "$HOME/.local/share/oma_alarm/qml/shell.qml"
+install -Dm644 oma_alarm.service "$HOME/.config/systemd/user/oma_alarm.service"
 mkdir -p "$HOME/.local/share/applications"
-sed "s|@BIN@|$bin|" omaalarm.desktop >"$HOME/.local/share/applications/omaalarm.desktop"
+sed "s|@BIN@|$bin|" oma_alarm.desktop >"$HOME/.local/share/applications/oma_alarm.desktop"
 systemctl --user daemon-reload
-systemctl --user enable --now omaalarm.service
-systemctl --user restart omaalarm.service
+systemctl --user enable --now oma_alarm.service
+systemctl --user restart oma_alarm.service
 echo "installed; open \"OmaAlarm\" from the app menu"
