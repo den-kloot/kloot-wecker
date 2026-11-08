@@ -11,4 +11,4 @@ sed "s|@BIN@|$bin|" omaalarm.desktop >"$HOME/.local/share/applications/omaalarm.
 systemctl --user daemon-reload
 systemctl --user enable --now omaalarm.service
 systemctl --user restart omaalarm.service
-echo "installed; open \"Oma Alarm\" from the app menu"
+echo "installed; open \"OmaAlarm\" from the app menu"

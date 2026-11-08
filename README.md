@@ -1,4 +1,4 @@
-# omaalarm
+# OmaAlarm
 
 A small alarm clock for Linux phones, built on Omarchy Mobile: a Qt Quick
 app (run by [Quickshell](https://quickshell.org), GPU-rendered) in the
@@ -38,7 +38,7 @@ ring window use Omarchy Mobile's `omarchy-shell` and `omamobile-launch`.
 
 ## Use
 
-- App menu: **Oma Alarm**. Or `omaalarm` in a terminal.
+- App menu: **OmaAlarm**. Or `omaalarm` in a terminal.
 - `omaalarm tui | list | stop | snooze | sounds | ring [--sound FILE] [--no-window] [LABEL]`
 - Alarms: `~/.config/omaalarm/alarms.json`.
 - Settings: `~/.config/omaalarm/omaalarm.env`:

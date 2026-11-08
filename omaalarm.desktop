@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=Oma Alarm
+Name=OmaAlarm
 Comment=Alarms with snooze
 Exec=@BIN@/omaalarm
 Icon=alarm-symbolic

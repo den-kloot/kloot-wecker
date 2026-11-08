@@ -313,7 +313,7 @@ ShellRoot {
 
     FloatingWindow {
         id: win
-        title: "Oma Alarm"
+        title: "OmaAlarm"
         color: root.bg
         implicitWidth: 412
         implicitHeight: 900

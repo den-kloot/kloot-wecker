@@ -614,9 +614,9 @@ def gui(mode):
         os.environ["OMAALARM_RUN"] = RUN
         os.execv(qs, [qs, "-p", os.path.join(d, "shell.qml")])
     if mode == "ring":
-        os.execvp("foot", ["foot", "--title=Oma Alarm", SELF, "ringtui"])
+        os.execvp("foot", ["foot", "--title=OmaAlarm", SELF, "ringtui"])
     if not sys.stdout.isatty():
-        os.execvp("foot", ["foot", "--title=Oma Alarm", SELF, "tui"])
+        os.execvp("foot", ["foot", "--title=OmaAlarm", SELF, "tui"])
     curses.wrapper(manager)
 
 
