@@ -609,6 +609,7 @@ def gui(mode):
     os.makedirs(RUN, exist_ok=True)
     if d and qs:
         os.environ["OMAALARM_MODE"] = mode
+        os.environ["QS_APP_ID"] = "omaalarm"  # window app id = the desktop entry
         os.environ["OMAALARM_BIN"] = SELF
         os.environ["OMAALARM_CONF"] = CONF
         os.environ["OMAALARM_RUN"] = RUN

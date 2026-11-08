@@ -340,7 +340,7 @@ ShellRoot {
             }
             Text {
                 id: title
-                text: "> omaalarm_"
+                text: "> OmaAlarm_"
                 color: root.accent
                 font.family: root.mono; font.pixelSize: 28; font.bold: true
                 anchors.left: parent.left; anchors.leftMargin: 20
