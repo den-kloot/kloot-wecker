@@ -558,7 +558,7 @@ ShellRoot {
                         Item {
                             y: 56; width: parent.width; height: 56
                             Rectangle { anchors.fill: parent; color: soundArea.pressed ? root.pressedFill : "transparent" }
-                            MouseArea { id: soundArea; anchors.fill: parent; onClicked: { root.stopPreview(); soundsProc.running = true; root.page = "sounds" } }
+                            MouseArea { id: soundArea; anchors.fill: parent; onClicked: { root.stopPreview(); root.setDraft({ time: editor.wheelTime(), label: labelField.text || "Alarm" }); soundsProc.running = true; root.page = "sounds" } }
                             Text { x: 14; anchors.verticalCenter: parent.verticalCenter; text: "Sound"; color: root.fg; font.family: root.mono; font.pixelSize: 17 }
                             Text {
                                 anchors.right: parent.right; anchors.rightMargin: 34
