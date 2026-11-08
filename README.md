@@ -4,15 +4,19 @@ A small alarm clock for Linux phones, built on Omarchy Mobile: a Qt Quick
 app (run by [Quickshell](https://quickshell.org), GPU-rendered) in the
 Omarchy look (square, monospace, thin borders) with scroll wheels for hours,
 minutes and seconds, a user service that rings,
-and a ring screen with **Snooze (5 min)** and **Stop**. The UI is in German.
+and a ring screen with **Snooze (5 min)** and **Stop**.
 It takes its colors from the current Omarchy theme
 (`~/.local/state/omarchy/current/theme/colors.toml`) and follows a theme switch
 within two seconds. Times are the phone's local time. Without Quickshell it falls back to a
 terminal UI in [foot](https://codeberg.org/dnkl/foot) (`kloot-wecker tui`).
 
+| Alarms | Edit | Sound | Ringing |
+| --- | --- | --- | --- |
+| ![Alarm list](docs/list.png) | ![Editing an alarm](docs/edit.png) | ![Choosing a sound](docs/sounds.png) | ![Ringing](docs/ring.png) |
+
 - New alarms start at 08:00. Several alarms, each with a time and weekdays (none = once, then it turns
   itself off), on/off, edit, delete, and a 5-second test.
-- **Your own sound per alarm:** in the alarm editor, tap **Ton** and pick an
+- **Your own sound per alarm:** in the alarm editor, tap **Sound** and pick an
   audio file (mp3, ogg, opus, flac, wav, m4a …) from your music folder
   (`~/Music` or the XDG music dir), `~/.local/share/sounds` or
   `/usr/share/sounds`. Tapping a sound chooses it and plays it.
@@ -34,7 +38,7 @@ ring window use Omarchy Mobile's `omarchy-shell` and `omamobile-launch`.
 
 ## Use
 
-- App menu: **Wecker**. Or `kloot-wecker` in a terminal.
+- App menu: **Alarm clock**. Or `kloot-wecker` in a terminal.
 - `kloot-wecker tui | list | stop | snooze | sounds | ring [--sound FILE] [--no-window] [LABEL]`
 - Alarms: `~/.config/kloot-wecker/alarms.json`.
 - Settings: `~/.config/kloot-wecker/wecker.env`:

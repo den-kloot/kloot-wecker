@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
-Name=Wecker
-Comment=Wecker mit Schlummern
+Name=Alarm clock
+Comment=Alarms with snooze
 Exec=@BIN@/kloot-wecker
 Icon=alarm-symbolic
 Terminal=false

@@ -12,8 +12,8 @@ ShellRoot {
     readonly property string bin: Quickshell.env("KLOOT_WECKER_BIN") || "kloot-wecker"
     readonly property string conf: Quickshell.env("KLOOT_WECKER_CONF") || (Quickshell.env("HOME") + "/.config/kloot-wecker")
     readonly property string run: Quickshell.env("KLOOT_WECKER_RUN") || "/tmp/kloot-wecker"
-    readonly property var dayNames: ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
-    readonly property var dayLetters: ["M", "D", "M", "D", "F", "S", "S"]
+    readonly property var dayNames: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    readonly property var dayLetters: ["M", "T", "W", "T", "F", "S", "S"]
 
     // Colors from the current Omarchy theme (colors.toml), re-read every
     // 2 s so a theme switch shows up right away; square corners, monospace,
@@ -68,15 +68,15 @@ ShellRoot {
         return pad(p[0]) + ":" + pad(p[1]) + (withSec && p[2] ? ":" + pad(p[2]) : "")
     }
     function daysText(days) {
-        if (!days || days.length === 0) return "Einmalig"
+        if (!days || days.length === 0) return "Once"
         var s = days.slice().sort()
-        if (s.length === 7) return "Täglich"
-        if (s.join() === "0,1,2,3,4") return "Mo–Fr"
-        if (s.join() === "5,6") return "Wochenende"
+        if (s.length === 7) return "Daily"
+        if (s.join() === "0,1,2,3,4") return "Weekdays"
+        if (s.join() === "5,6") return "Weekend"
         return s.map(function(d) { return dayNames[d] }).join(" ")
     }
     function soundName(path) {
-        if (!path) return "Standard"
+        if (!path) return "Default"
         var b = path.split("/").pop()
         var i = b.lastIndexOf(".")
         return i > 0 ? b.substring(0, i) : b
@@ -98,7 +98,7 @@ ShellRoot {
         if (!d) return ""
         var mins = Math.floor((d - now) / 60000) + 1
         var h = Math.floor(mins / 60), m = mins % 60
-        if (h >= 24) return "in " + Math.floor(h / 24) + " T " + (h % 24) + " h"
+        if (h >= 24) return "in " + Math.floor(h / 24) + " d " + (h % 24) + " h"
         return h > 0 ? "in " + h + " h " + m + " min" : "in " + m + " min"
     }
     function sorted(list) {
@@ -126,7 +126,7 @@ ShellRoot {
     function openEditor(a) {
         draftIsNew = !a
         draft = a ? Object.assign({}, a, { days: (a.days || []).slice() })
-                  : { id: newId(), time: "08:00:00", days: [], enabled: true, label: "Wecker", sound: "" }
+                  : { id: newId(), time: "08:00:00", days: [], enabled: true, label: "Alarm", sound: "" }
         page = "edit"
     }
     function commitDraft() {
@@ -189,10 +189,10 @@ ShellRoot {
     FileView {
         id: ringFile
         path: root.page === "ring" ? root.run + "/ringing.json" : ""
-        property string label: "Wecker"
+        property string label: "Alarm"
         onLoaded: {
             root.ringSeen = true
-            try { label = JSON.parse(text()).label || "Wecker" } catch (e) {}
+            try { label = JSON.parse(text()).label || "Alarm" } catch (e) {}
         }
         onLoadFailed: {
             // The ringing ended elsewhere (stop from the CLI, timeout).
@@ -272,7 +272,7 @@ ShellRoot {
         border.color: checked ? root.accent : root.sep
         Text {
             anchors.centerIn: parent
-            text: tg.checked ? "AN" : "AUS"
+            text: tg.checked ? "ON" : "OFF"
             color: tg.checked ? root.bg : root.fg2
             font.family: root.mono; font.pixelSize: 15; font.bold: true
         }
@@ -313,7 +313,7 @@ ShellRoot {
 
     FloatingWindow {
         id: win
-        title: "Wecker"
+        title: "Alarm clock"
         color: root.bg
         implicitWidth: 412
         implicitHeight: 900
@@ -333,14 +333,14 @@ ShellRoot {
                 onClicked: root.startTest()
             }
             TextButton {
-                text: "+ Neu"; primary: true
+                text: "+ New"; primary: true
                 anchors.right: parent.right; anchors.rightMargin: 20
                 anchors.verticalCenter: testBtn.verticalCenter
                 onClicked: root.openEditor(null)
             }
             Text {
                 id: title
-                text: "> wecker_"
+                text: "> alarms_"
                 color: root.accent
                 font.family: root.mono; font.pixelSize: 28; font.bold: true
                 anchors.left: parent.left; anchors.leftMargin: 20
@@ -350,7 +350,7 @@ ShellRoot {
             Text {
                 visible: root.alarms.length === 0
                 anchors.centerIn: parent
-                text: "Kein Wecker\nTippe auf +"
+                text: "No alarms yet\nTap + New"
                 horizontalAlignment: Text.AlignHCenter
                 color: root.fg2; font.family: root.mono; font.pixelSize: 20
             }
@@ -382,7 +382,7 @@ ShellRoot {
                             font.family: root.mono; font.pixelSize: 46; font.bold: row.modelData.enabled
                         }
                         Text {
-                            text: (row.modelData.label || "Wecker") + ", " + root.daysText(row.modelData.days)
+                            text: (row.modelData.label || "Alarm") + ", " + root.daysText(row.modelData.days)
                                   + (row.modelData.enabled ? "  ·  " + root.untilText(root.nextRing(row.modelData)) : "")
                             color: row.modelData.enabled ? root.fg : root.fg2
                             font.family: root.mono; font.pixelSize: 15
@@ -414,7 +414,7 @@ ShellRoot {
                     hWheel.currentIndex = p[0]
                     mWheel.currentIndex = p[1]
                     sWheel.currentIndex = p[2]
-                    labelField.text = root.draft.label || "Wecker"
+                    labelField.text = root.draft.label || "Alarm"
                 }
             }
             function wheelTime() {
@@ -423,23 +423,23 @@ ShellRoot {
 
             TextButton {
                 id: cancelBtn
-                text: "Abbrechen"
+                text: "Cancel"
                 anchors.left: parent.left; anchors.leftMargin: 20
                 anchors.top: parent.top; anchors.topMargin: 20
                 onClicked: { root.stopPreview(); root.page = "list" }
             }
             Text {
-                text: root.draftIsNew ? "neu" : "bearbeiten"
+                text: root.draftIsNew ? "new alarm" : "edit alarm"
                 color: root.fg; font.family: root.mono; font.pixelSize: 18; font.weight: Font.DemiBold
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.verticalCenter: cancelBtn.verticalCenter
             }
             TextButton {
-                text: "Sichern"; primary: true
+                text: "Save"; primary: true
                 anchors.right: parent.right; anchors.rightMargin: 20
                 anchors.verticalCenter: cancelBtn.verticalCenter
                 onClicked: {
-                    root.setDraft({ time: editor.wheelTime(), label: labelField.text || "Wecker" })
+                    root.setDraft({ time: editor.wheelTime(), label: labelField.text || "Alarm" })
                     root.commitDraft()
                 }
             }
@@ -462,9 +462,9 @@ ShellRoot {
                     anchors.horizontalCenterOffset: -16
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 30
-                    Wheel { id: hWheel; n: 24; unit: "Std" }
-                    Wheel { id: mWheel; n: 60; unit: "Min" }
-                    Wheel { id: sWheel; n: 60; unit: "Sek" }
+                    Wheel { id: hWheel; n: 24; unit: "hr" }
+                    Wheel { id: mWheel; n: 60; unit: "min" }
+                    Wheel { id: sWheel; n: 60; unit: "sec" }
                 }
             }
 
@@ -486,7 +486,7 @@ ShellRoot {
                             x: 14; y: 14; width: parent.width - 28; spacing: 14
                             Row {
                                 width: parent.width
-                                Text { text: "Wiederholen"; color: root.fg; font.family: root.mono; font.pixelSize: 17; width: parent.width / 2 }
+                                Text { text: "Repeat"; color: root.fg; font.family: root.mono; font.pixelSize: 17; width: parent.width / 2 }
                                 Text {
                                     text: root.draft ? root.daysText(root.draft.days) : ""
                                     color: root.fg2; font.family: root.mono; font.pixelSize: 17
@@ -524,7 +524,7 @@ ShellRoot {
                                 width: parent.width
                                 spacing: 10
                                 Repeater {
-                                    model: [["Mo–Fr", [0, 1, 2, 3, 4]], ["Wochenende", [5, 6]], ["Täglich", [0, 1, 2, 3, 4, 5, 6]], ["Einmalig", []]]
+                                    model: [["Weekdays", [0, 1, 2, 3, 4]], ["Weekend", [5, 6]], ["Daily", [0, 1, 2, 3, 4, 5, 6]], ["Once", []]]
                                     Rectangle {
                                         required property var modelData
                                         height: 32; width: chip.width + 20
@@ -543,7 +543,7 @@ ShellRoot {
                         width: parent.width; height: 112; color: root.card; border.width: 1; border.color: root.sep
                         Item {
                             width: parent.width; height: 56
-                            Text { x: 14; anchors.verticalCenter: parent.verticalCenter; text: "Name"; color: root.fg; font.family: root.mono; font.pixelSize: 17 }
+                            Text { x: 14; anchors.verticalCenter: parent.verticalCenter; text: "Label"; color: root.fg; font.family: root.mono; font.pixelSize: 17 }
                             TextField {
                                 id: labelField
                                 anchors.right: parent.right; anchors.rightMargin: 14
@@ -559,7 +559,7 @@ ShellRoot {
                             y: 56; width: parent.width; height: 56
                             Rectangle { anchors.fill: parent; color: soundArea.pressed ? root.pressedFill : "transparent" }
                             MouseArea { id: soundArea; anchors.fill: parent; onClicked: { root.stopPreview(); soundsProc.running = true; root.page = "sounds" } }
-                            Text { x: 14; anchors.verticalCenter: parent.verticalCenter; text: "Ton"; color: root.fg; font.family: root.mono; font.pixelSize: 17 }
+                            Text { x: 14; anchors.verticalCenter: parent.verticalCenter; text: "Sound"; color: root.fg; font.family: root.mono; font.pixelSize: 17 }
                             Text {
                                 anchors.right: parent.right; anchors.rightMargin: 34
                                 anchors.verticalCenter: parent.verticalCenter
@@ -577,7 +577,7 @@ ShellRoot {
                         width: parent.width; height: 56
                         color: delArea.pressed ? root.pressedFill : root.card
                         border.width: 1; border.color: root.red
-                        Text { anchors.centerIn: parent; text: "Wecker löschen"; color: root.red; font.family: root.mono; font.pixelSize: 17 }
+                        Text { anchors.centerIn: parent; text: "Delete alarm"; color: root.red; font.family: root.mono; font.pixelSize: 17 }
                         MouseArea { id: delArea; anchors.fill: parent; onClicked: root.deleteDraft() }
                     }
                 }
@@ -591,13 +591,13 @@ ShellRoot {
 
             TextButton {
                 id: backBtn
-                text: "< Zurück"
+                text: "< Back"
                 anchors.left: parent.left; anchors.leftMargin: 14
                 anchors.top: parent.top; anchors.topMargin: 20
                 onClicked: { root.stopPreview(); root.page = "edit" }
             }
             Text {
-                text: "Ton"; color: root.fg; font.family: root.mono; font.pixelSize: 18; font.weight: Font.DemiBold
+                text: "Sound"; color: root.fg; font.family: root.mono; font.pixelSize: 18; font.weight: Font.DemiBold
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.verticalCenter: backBtn.verticalCenter
             }
@@ -605,7 +605,7 @@ ShellRoot {
                 id: hint
                 anchors.top: backBtn.bottom; anchors.topMargin: 18
                 x: 20; width: parent.width - 40; wrapMode: Text.WordWrap
-                text: "Antippen wählt den Ton und spielt ihn an. Eigene Dateien in den Musik-Ordner legen."
+                text: "Tap a sound to choose it and hear it. Put your own files in your Music folder."
                 color: root.fg2; font.family: root.mono; font.pixelSize: 14
             }
             ListView {
@@ -657,9 +657,9 @@ ShellRoot {
             visible: root.page === "countdown"
             Column {
                 anchors.centerIn: parent; spacing: 30
-                Text { anchors.horizontalCenter: parent.horizontalCenter; text: "Test klingelt in"; color: root.fg2; font.family: root.mono; font.pixelSize: 20 }
+                Text { anchors.horizontalCenter: parent.horizontalCenter; text: "Test rings in"; color: root.fg2; font.family: root.mono; font.pixelSize: 20 }
                 Text { anchors.horizontalCenter: parent.horizontalCenter; text: root.countdown; color: root.accent; font.family: root.mono; font.pixelSize: 120; font.bold: true }
-                TextButton { anchors.horizontalCenter: parent.horizontalCenter; text: "Abbrechen"; onClicked: root.page = "list" }
+                TextButton { anchors.horizontalCenter: parent.horizontalCenter; text: "Cancel"; onClicked: root.page = "list" }
             }
         }
 
@@ -690,7 +690,7 @@ ShellRoot {
                 y: parent.height * 0.48
                 width: parent.width - 40; height: 120
                 color: snArea.pressed ? Qt.darker(root.accent, 1.3) : root.accent
-                Text { anchors.centerIn: parent; text: "[ Schlummern 5 min ]"; color: root.bg; font.family: root.mono; font.pixelSize: 24; font.bold: true }
+                Text { anchors.centerIn: parent; text: "[ Snooze 5 min ]"; color: root.bg; font.family: root.mono; font.pixelSize: 24; font.bold: true }
                 MouseArea { id: snArea; anchors.fill: parent; onClicked: root.ringAction("snooze") }
             }
             Rectangle {
@@ -699,7 +699,7 @@ ShellRoot {
                 width: parent.width - 40; height: 100
                 color: stArea.pressed ? root.pressedFill : root.card
                 border.width: 2; border.color: root.red
-                Text { anchors.centerIn: parent; text: "[ Stopp ]"; color: root.red; font.family: root.mono; font.pixelSize: 24; font.bold: true }
+                Text { anchors.centerIn: parent; text: "[ Stop ]"; color: root.red; font.family: root.mono; font.pixelSize: 24; font.bold: true }
                 MouseArea { id: stArea; anchors.fill: parent; onClicked: root.ringAction("stop") }
             }
         }

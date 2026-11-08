@@ -11,4 +11,4 @@ sed "s|@BIN@|$bin|" kloot-wecker.desktop >"$HOME/.local/share/applications/kloot
 systemctl --user daemon-reload
 systemctl --user enable --now kloot-wecker.service
 systemctl --user restart kloot-wecker.service
-echo "installed; open \"Wecker\" from the app menu"
+echo "installed; open \"Alarm clock\" from the app menu"
